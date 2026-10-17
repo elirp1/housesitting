@@ -1,0 +1,237 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Your Business Name | House Sitting & Pet Care</title>
+<style>
+  :root {
+    --cream: #fbf6ee;
+    --sage: #6b8f71;
+    --sage-dark: #4f7156;
+    --clay: #d98c5f;
+    --ink: #2f3a33;
+    --muted: #6d756f;
+    --card: #ffffff;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html { scroll-behavior: smooth; }
+  body {
+    font-family: Georgia, "Times New Roman", serif;
+    background: var(--cream);
+    color: var(--ink);
+    line-height: 1.6;
+  }
+  h1, h2, h3, .btn, nav, label, input, button {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  }
+  .wrap { max-width: 960px; margin: 0 auto; padding: 0 20px; }
+
+  /* Password gate */
+  #gate {
+    position: fixed; inset: 0;
+    display: flex; align-items: center; justify-content: center;
+    background: var(--cream);
+    padding: 20px;
+    z-index: 100;
+  }
+  .gate-box {
+    background: var(--card);
+    padding: 36px 32px;
+    border-radius: 16px;
+    box-shadow: 0 8px 30px rgba(0,0,0,.08);
+    max-width: 380px; width: 100%;
+    text-align: center;
+  }
+  .gate-box .paw { font-size: 2.4rem; }
+  .gate-box h1 { font-size: 1.4rem; margin: 8px 0 6px; }
+  .gate-box p { color: var(--muted); font-size: .95rem; margin-bottom: 20px; }
+  .gate-box input {
+    width: 100%; padding: 12px 14px; font-size: 1rem;
+    border: 1.5px solid #d9d4c8; border-radius: 10px; margin-bottom: 12px;
+  }
+  .gate-box input:focus { outline: none; border-color: var(--sage); }
+  .gate-box button {
+    width: 100%; padding: 12px; font-size: 1rem; font-weight: 600;
+    background: var(--sage); color: #fff; border: none; border-radius: 10px; cursor: pointer;
+  }
+  .gate-box button:hover { background: var(--sage-dark); }
+  #gate-error { color: #b3402a; font-size: .9rem; min-height: 1.3em; margin-top: 10px; }
+
+  #site { display: none; }
+
+  /* Header */
+  header { padding: 18px 0; }
+  header .wrap { display: flex; justify-content: space-between; align-items: center; }
+  .logo { font-family: -apple-system, "Segoe UI", sans-serif; font-weight: 700; font-size: 1.15rem; color: var(--sage-dark); }
+  nav a { margin-left: 22px; color: var(--ink); text-decoration: none; font-size: .95rem; }
+  nav a:hover { color: var(--sage-dark); }
+
+  /* Hero */
+  .hero { padding: 70px 0 80px; text-align: center; }
+  .hero h1 { font-size: clamp(2rem, 5vw, 3.2rem); line-height: 1.15; margin-bottom: 16px; }
+  .hero p { font-size: 1.15rem; color: var(--muted); max-width: 560px; margin: 0 auto 30px; }
+  .btn {
+    display: inline-block; padding: 14px 30px; border-radius: 999px;
+    background: var(--clay); color: #fff; text-decoration: none;
+    font-weight: 600; font-size: 1.05rem;
+    transition: transform .15s, background .15s;
+  }
+  .btn:hover { background: #c87a4d; transform: translateY(-2px); }
+
+  /* Sections */
+  section { padding: 56px 0; }
+  section h2 { text-align: center; font-size: 1.8rem; margin-bottom: 36px; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 22px; }
+  .card { background: var(--card); padding: 28px 24px; border-radius: 14px; box-shadow: 0 2px 12px rgba(0,0,0,.05); }
+  .card .icon { font-size: 2rem; margin-bottom: 10px; }
+  .card h3 { font-size: 1.1rem; margin-bottom: 8px; }
+  .card p { color: var(--muted); font-size: .98rem; }
+
+  .alt { background: #f1ebde; }
+  .steps { counter-reset: step; }
+  .step { text-align: center; }
+  .step::before {
+    counter-increment: step; content: counter(step);
+    display: inline-flex; width: 42px; height: 42px; align-items: center; justify-content: center;
+    background: var(--sage); color: #fff; border-radius: 50%;
+    font-family: -apple-system, sans-serif; font-weight: 700; margin-bottom: 12px;
+  }
+  .step h3 { font-size: 1.05rem; margin-bottom: 6px; }
+  .step p { color: var(--muted); font-size: .96rem; }
+
+  .cta { text-align: center; }
+  .cta p { color: var(--muted); max-width: 520px; margin: 0 auto 26px; }
+
+  footer { text-align: center; padding: 30px 0 40px; color: var(--muted); font-size: .9rem; }
+</style>
+</head>
+<body>
+
+<!-- Password gate -->
+<div id="gate">
+  <form class="gate-box" id="gate-form">
+    <div class="paw">🐾</div>
+    <h1>Welcome</h1>
+    <p>Please enter the password to view this site.</p>
+    <input type="password" id="pw" placeholder="Password" autocomplete="current-password" autofocus>
+    <button type="submit">Enter</button>
+    <div id="gate-error" role="alert"></div>
+  </form>
+</div>
+
+<!-- Site content -->
+<div id="site">
+  <header>
+    <div class="wrap">
+      <div class="logo">🐾 Your Business Name</div>
+      <nav>
+        <a href="#services">Services</a>
+        <a href="#how">How it works</a>
+        <a href="#contact">Contact</a>
+      </nav>
+    </div>
+  </header>
+
+  <div class="hero">
+    <div class="wrap">
+      <h1>Your home and your pets,<br>in caring hands.</h1>
+      <p>Reliable house sitting and pet care so you can travel with peace of mind, knowing everyone at home is happy and looked after.</p>
+      <a class="btn" href="YOUR_FORM_LINK_HERE" target="_blank" rel="noopener">Request Care</a>
+    </div>
+  </div>
+
+  <section id="services">
+    <div class="wrap">
+      <h2>Services</h2>
+      <div class="grid">
+        <div class="card">
+          <div class="icon">🏡</div>
+          <h3>House Sitting</h3>
+          <p>Overnight stays, mail and plant care, and a lived-in feel while you're away.</p>
+        </div>
+        <div class="card">
+          <div class="icon">🐕</div>
+          <h3>Pet Care</h3>
+          <p>Feeding, walks, playtime, medication, and plenty of love, on your pet's usual routine.</p>
+        </div>
+        <div class="card">
+          <div class="icon">📸</div>
+          <h3>Daily Updates</h3>
+          <p>Photos and messages so you can see how everyone is doing while you're gone.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section id="how" class="alt">
+    <div class="wrap">
+      <h2>How It Works</h2>
+      <div class="grid steps">
+        <div class="step">
+          <h3>Tell me about your needs</h3>
+          <p>Fill out the short request form with your dates, pets, and home details.</p>
+        </div>
+        <div class="step">
+          <h3>Meet &amp; greet</h3>
+          <p>We'll connect so your pets and I can meet and I can learn your routines.</p>
+        </div>
+        <div class="step">
+          <h3>Relax and travel</h3>
+          <p>Enjoy your time away while I take care of everything at home.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section id="contact" class="cta">
+    <div class="wrap">
+      <h2>Ready to get started?</h2>
+      <p>Fill out the form and I'll get back to you soon to talk through your dates and needs.</p>
+      <a class="btn" href="YOUR_FORM_LINK_HERE" target="_blank" rel="noopener">Fill Out the Client Form</a>
+    </div>
+  </section>
+
+  <footer>
+    <div class="wrap">© <span id="year"></span> Your Business Name · House Sitting &amp; Pet Care</div>
+  </footer>
+</div>
+
+<script>
+  // SHA-256 hash of the site password (default password: PetsWelcome).
+  // To change it, see the note from Claude, or replace this hash with the hash of your own password.
+  const PASSWORD_HASH = "94c9e641e5d2e7579771ae1ef3d71e9d1e6200cab8d522b85b701000e1311802";
+
+  async function sha256(text) {
+    const buf = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(text));
+    return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2, "0")).join("");
+  }
+
+  function unlock() {
+    document.getElementById("gate").style.display = "none";
+    document.getElementById("site").style.display = "block";
+    document.getElementById("year").textContent = new Date().getFullYear();
+  }
+
+  // Stay unlocked for this browser session
+  try { if (sessionStorage.getItem("unlocked") === PASSWORD_HASH) unlock(); } catch (e) {}
+
+  document.getElementById("gate-form").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const entered = document.getElementById("pw").value;
+    const err = document.getElementById("gate-error");
+    try {
+      if (await sha256(entered) === PASSWORD_HASH) {
+        try { sessionStorage.setItem("unlocked", PASSWORD_HASH); } catch (e) {}
+        unlock();
+      } else {
+        err.textContent = "That password isn't right. Please try again.";
+        document.getElementById("pw").select();
+      }
+    } catch (ex) {
+      err.textContent = "Couldn't check the password. Please open this page over https or in a modern browser.";
+    }
+  });
+</script>
+</body>
+</html>
