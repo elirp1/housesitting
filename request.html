@@ -1,0 +1,231 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Request Care | Your Business Name</title>
+<style>
+  :root {
+    --cream: #fbf6ee;
+    --sage: #6b8f71;
+    --sage-dark: #4f7156;
+    --clay: #d98c5f;
+    --ink: #2f3a33;
+    --muted: #6d756f;
+    --card: #ffffff;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: Georgia, "Times New Roman", serif;
+    background: var(--cream);
+    color: var(--ink);
+    line-height: 1.6;
+    display: none; /* shown only after the password check passes */
+  }
+  h1, h2, nav, label, input, select, textarea, button, .btn, legend {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  }
+  .wrap { max-width: 720px; margin: 0 auto; padding: 0 20px; }
+
+  header { padding: 18px 0; }
+  header .wrap { display: flex; justify-content: space-between; align-items: center; }
+  .logo { font-family: -apple-system, "Segoe UI", sans-serif; font-weight: 700; font-size: 1.15rem; color: var(--sage-dark); text-decoration: none; }
+  header a.back { color: var(--ink); text-decoration: none; font-size: .95rem; font-family: -apple-system, "Segoe UI", sans-serif; }
+  header a.back:hover { color: var(--sage-dark); }
+
+  .intro { text-align: center; padding: 30px 0 24px; }
+  .intro h1 { font-size: clamp(1.7rem, 4vw, 2.4rem); margin-bottom: 10px; }
+  .intro p { color: var(--muted); max-width: 520px; margin: 0 auto; }
+
+  form {
+    background: var(--card);
+    padding: 32px 28px;
+    border-radius: 16px;
+    box-shadow: 0 4px 20px rgba(0,0,0,.06);
+    margin-bottom: 50px;
+  }
+  fieldset { border: none; margin-bottom: 26px; }
+  legend {
+    font-size: 1.05rem; font-weight: 700; color: var(--sage-dark);
+    margin-bottom: 14px; padding-bottom: 6px; border-bottom: 2px solid #ece5d6; width: 100%;
+  }
+  .row { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  .field { margin-bottom: 16px; }
+  label { display: block; font-size: .92rem; font-weight: 600; margin-bottom: 6px; }
+  label .opt { font-weight: 400; color: var(--muted); }
+  input, select, textarea {
+    width: 100%; padding: 11px 13px; font-size: 1rem;
+    border: 1.5px solid #d9d4c8; border-radius: 10px;
+    background: #fff; color: var(--ink);
+  }
+  textarea { resize: vertical; min-height: 96px; }
+  input:focus, select:focus, textarea:focus { outline: none; border-color: var(--sage); }
+
+  .submit {
+    width: 100%; padding: 14px; font-size: 1.05rem; font-weight: 600;
+    background: var(--clay); color: #fff; border: none; border-radius: 999px; cursor: pointer;
+    transition: background .15s;
+  }
+  .submit:hover { background: #c87a4d; }
+  .note { text-align: center; color: var(--muted); font-size: .88rem; margin-top: 12px; }
+
+  .thanks {
+    display: none;
+    background: #e8f1e9; border: 1.5px solid var(--sage);
+    color: var(--sage-dark); padding: 18px 20px; border-radius: 12px;
+    margin-bottom: 24px; text-align: center; font-family: -apple-system, "Segoe UI", sans-serif;
+  }
+
+  .hp { position: absolute; left: -9999px; }
+
+  @media (max-width: 560px) {
+    .row { grid-template-columns: 1fr; gap: 0; }
+    form { padding: 24px 18px; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="wrap">
+    <a class="logo" href="index.html">🐾 Your Business Name</a>
+    <a class="back" href="index.html">← Back to home</a>
+  </div>
+</header>
+
+<div class="wrap">
+  <div class="intro">
+    <h1>Request Care</h1>
+    <p>Tell me a little about you, your home, and your pets, and I'll get back to you soon to talk through the details.</p>
+  </div>
+
+  <div class="thanks" id="thanks">
+    🐾 Thank you! Your request has been sent. I'll be in touch soon.
+  </div>
+
+  <!--
+    SETUP: Replace YOUR_EMAIL_HERE below with the email address where you want to receive requests.
+    The first time anyone submits the form, FormSubmit will email you a one-time activation link. Click it once and requests will start arriving.
+  -->
+  <form id="request-form" action="https://formsubmit.co/YOUR_EMAIL_HERE" method="POST">
+
+    <!-- FormSubmit settings -->
+    <input type="hidden" name="_subject" value="New care request from your website">
+    <input type="hidden" name="_template" value="table">
+    <input type="hidden" name="_next" id="next-url" value="">
+    <input type="text" name="_honey" class="hp" tabindex="-1" autocomplete="off" aria-hidden="true">
+
+    <fieldset>
+      <legend>About you</legend>
+      <div class="field">
+        <label for="name">Full name</label>
+        <input type="text" id="name" name="Name" required autocomplete="name">
+      </div>
+      <div class="row">
+        <div class="field">
+          <label for="email">Email</label>
+          <input type="email" id="email" name="Email" required autocomplete="email">
+        </div>
+        <div class="field">
+          <label for="phone">Phone <span class="opt">(optional)</span></label>
+          <input type="tel" id="phone" name="Phone" autocomplete="tel">
+        </div>
+      </div>
+      <div class="field">
+        <label for="contact-pref">Best way to reach you</label>
+        <select id="contact-pref" name="Preferred contact method">
+          <option>Email</option>
+          <option>Phone call</option>
+          <option>Text message</option>
+        </select>
+      </div>
+    </fieldset>
+
+    <fieldset>
+      <legend>What you need</legend>
+      <div class="field">
+        <label for="service">Service</label>
+        <select id="service" name="Service requested" required>
+          <option value="" disabled selected>Choose one…</option>
+          <option>House sitting (overnight stays)</option>
+          <option>Pet care visits (feeding, walks, play)</option>
+          <option>House sitting and pet care</option>
+          <option>Not sure yet</option>
+        </select>
+      </div>
+      <div class="row">
+        <div class="field">
+          <label for="start">Start date</label>
+          <input type="date" id="start" name="Start date" required>
+        </div>
+        <div class="field">
+          <label for="end">End date</label>
+          <input type="date" id="end" name="End date" required>
+        </div>
+      </div>
+      <div class="field">
+        <label for="city">Home location <span class="opt">(town or neighborhood)</span></label>
+        <input type="text" id="city" name="Home location" required>
+      </div>
+    </fieldset>
+
+    <fieldset>
+      <legend>Your pets</legend>
+      <div class="field">
+        <label for="num-pets">Number of pets</label>
+        <input type="number" id="num-pets" name="Number of pets" min="0" max="20" required>
+      </div>
+      <div class="field">
+        <label for="pet-details">Names, types and breeds, and ages</label>
+        <textarea id="pet-details" name="Pet details" placeholder="Example: Biscuit, golden retriever, 5 years old" required></textarea>
+      </div>
+      <div class="field">
+        <label for="care-needs">Routines, medications, or special needs <span class="opt">(optional)</span></label>
+        <textarea id="care-needs" name="Care needs"></textarea>
+      </div>
+    </fieldset>
+
+    <fieldset>
+      <legend>Anything else?</legend>
+      <div class="field">
+        <label for="heard">How did you hear about me? <span class="opt">(optional)</span></label>
+        <input type="text" id="heard" name="Referral source">
+      </div>
+      <div class="field">
+        <label for="notes">Other details or questions <span class="opt">(optional)</span></label>
+        <textarea id="notes" name="Additional notes"></textarea>
+      </div>
+    </fieldset>
+
+    <button class="submit" type="submit">Send Request</button>
+    <p class="note">I'll reply to the email or phone number you provided.</p>
+  </form>
+</div>
+
+<script>
+  // Same shared password as the main page. Visitors who haven't entered it are sent back to the home page.
+  const PASSWORD_HASH = "94c9e641e5d2e7579771ae1ef3d71e9d1e6200cab8d522b85b701000e1311802";
+  let unlocked = false;
+  try { unlocked = sessionStorage.getItem("unlocked") === PASSWORD_HASH; } catch (e) {}
+  if (!unlocked) {
+    window.location.replace("index.html");
+  } else {
+    document.body.style.display = "block";
+  }
+
+  // After submitting, FormSubmit sends the visitor back here with ?sent=1
+  const params = new URLSearchParams(window.location.search);
+  if (params.get("sent") === "1") {
+    document.getElementById("thanks").style.display = "block";
+    document.getElementById("request-form").style.display = "none";
+  }
+  document.getElementById("next-url").value =
+    window.location.href.split("?")[0] + "?sent=1";
+
+  // Make sure the end date can't be before the start date
+  const start = document.getElementById("start");
+  const end = document.getElementById("end");
+  start.addEventListener("change", () => { end.min = start.value; });
+</script>
+</body>
+</html>
