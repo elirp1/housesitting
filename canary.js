@@ -7,12 +7,17 @@
     tap or key press instead.
   - On the home page, if an element with id="canary" exists, it gets the class "singing"
     while a phrase is playing so the bird can animate in time with the song.
+
+  Realism notes: every syllable follows a curved pitch contour (not a straight glide), has
+  several harmonics, a touch of breath noise, tiny random pitch/timing/volume variation and its
+  own position in the stereo field. Songs are built from "tours" (one syllable repeated, speeding
+  up or slowing down) like a real canary, with a gentle room reverb and a soft compressor.
 */
 (function () {
   'use strict';
 
   var MUTE_KEY = 'canaryMuted';
-  var MASTER_LEVEL = 0.24;          // overall volume: soft and relaxing
+  var MASTER_LEVEL = 0.26;          // overall volume: soft and relaxing
   var ctx = null, graph = null;
   var started = false, muted = false, loopOn = false, waiting = false;
   var loopTimer = null, singTimer = null;
@@ -34,85 +39,201 @@
 
   function buildGraph(c) {
     var out = c.createGain();  out.gain.value = 0;                 // master volume (fades in and out)
-    var tone = c.createBiquadFilter(); tone.type = 'lowpass'; tone.frequency.value = 7000;
+    var comp = c.createDynamicsCompressor();                       // keeps busy trills from clipping
+    comp.threshold.value = -20; comp.knee.value = 18; comp.ratio.value = 3;
+    comp.attack.value = 0.004; comp.release.value = 0.12;
+    var tone = c.createBiquadFilter(); tone.type = 'lowpass'; tone.frequency.value = 9000;
     var bus = c.createGain();
-    var wet = c.createGain();  wet.gain.value = 0.32;
-    var verb = c.createConvolver(); verb.buffer = impulse(c, 1.7, 2.6);
+    var wet = c.createGain();  wet.gain.value = 0.26;
+    var verb = c.createConvolver(); verb.buffer = impulse(c, 1.5, 2.8);
     bus.connect(tone); bus.connect(verb); verb.connect(wet); wet.connect(tone);
-    tone.connect(out); out.connect(c.destination);
+    tone.connect(comp); comp.connect(out); out.connect(c.destination);
     return { bus: bus, out: out };
   }
 
-  // One syllable: a short gliding whistle, optionally with vibrato, plus a faint overtone for sparkle.
+  function rnd(a, b) { return a + Math.random() * (b - a); }
+  function jit(v, amt) { return v * (1 + rnd(-amt, amt)); }
+
+  var curPan = 0;                                   // the bird sits slightly off-centre per phrase
+  function pan() { return Math.max(-0.7, Math.min(0.7, curPan + rnd(-0.1, 0.1))); }
+
+  function noiseBuffer(c) {
+    if (!c._canaryNoise) {
+      var len = Math.floor(c.sampleRate * 0.6);
+      var buf = c.createBuffer(1, len, c.sampleRate), d = buf.getChannelData(0);
+      for (var i = 0; i < len; i++) d[i] = Math.random() * 2 - 1;
+      c._canaryNoise = buf;
+    }
+    return c._canaryNoise;
+  }
+
+  /*
+    One syllable. Options:
+      f0, f1   start / end frequency (Hz)
+      bend     curve of the pitch in log-units (+ arches up in the middle, - dips down)
+      ease     <1 jumps quickly then settles, >1 holds then sweeps
+      dur, gain, attack
+      vib, depth   vibrato rate (Hz) and depth (Hz)
+      harm     array of [multiple, volume] overtones
+      breath   0-1 amount of airy noise
+      pan      stereo position
+  */
   function chirp(c, bus, t, o) {
-    var parts = [{ mult: 1, vol: 1 }, { mult: 2, vol: 0.14 }];
-    for (var p = 0; p < parts.length; p++) {
-      var m = parts[p].mult;
+    var dur = o.dur;
+    var n = Math.max(10, Math.min(48, Math.round(dur * 600)));
+    var lf0 = Math.log(o.f0), lf1 = Math.log(o.f1), bend = o.bend || 0, ease = o.ease || 1;
+    var curve = new Float32Array(n), i, x;
+    for (i = 0; i < n; i++) {
+      x = i / (n - 1);
+      curve[i] = Math.exp(lf0 + (lf1 - lf0) * Math.pow(x, ease) + bend * Math.sin(Math.PI * x));
+    }
+
+    var g = c.createGain();
+    var peak = o.gain;
+    var a = Math.min(o.attack || 0.012, dur * 0.35);
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(peak, t + a);
+    if (dur > 0.12) g.gain.exponentialRampToValueAtTime(peak * 0.8, t + dur * 0.6);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+
+    var out = g;
+    if (c.createStereoPanner) {
+      var p = c.createStereoPanner(); p.pan.value = o.pan === undefined ? pan() : o.pan;
+      g.connect(p); out = p;
+    }
+    out.connect(bus);
+
+    var lfo = null;
+    if (o.vib) {
+      lfo = c.createOscillator(); lfo.frequency.value = o.vib * rnd(0.92, 1.08);
+      lfo.start(t); lfo.stop(t + dur + 0.05);
+    }
+
+    var harm = o.harm || [[1, 1], [2, 0.2], [3, 0.06]];
+    for (var h = 0; h < harm.length; h++) {
+      var m = harm[h][0], v = harm[h][1];
       var osc = c.createOscillator(); osc.type = 'sine';
-      osc.frequency.setValueAtTime(o.f0 * m, t);
-      osc.frequency.exponentialRampToValueAtTime(o.f1 * m, t + o.dur);
-      if (o.vib) {
-        var lfo = c.createOscillator(), depth = c.createGain();
-        lfo.frequency.value = o.vib; depth.gain.value = (o.depth || 0) * m;
+      var scaled = new Float32Array(n);
+      for (i = 0; i < n; i++) scaled[i] = curve[i] * m;
+      osc.frequency.setValueCurveAtTime(scaled, t, dur);
+      if (lfo) {
+        var depth = c.createGain(); depth.gain.value = (o.depth || 0) * m;
         lfo.connect(depth); depth.connect(osc.frequency);
-        lfo.start(t); lfo.stop(t + o.dur + 0.05);
       }
-      var g = c.createGain();
-      var peak = o.gain * parts[p].vol;
-      g.gain.setValueAtTime(0.0001, t);
-      g.gain.exponentialRampToValueAtTime(peak, t + Math.min(0.014, o.dur * 0.3));
-      g.gain.exponentialRampToValueAtTime(0.0001, t + o.dur);
-      osc.connect(g); g.connect(bus);
-      osc.start(t); osc.stop(t + o.dur + 0.05);
+      var hg = c.createGain(); hg.gain.value = v;
+      osc.connect(hg); hg.connect(g);
+      osc.start(t); osc.stop(t + dur + 0.05);
+    }
+
+    if (o.breath) {                                  // a little air in the voice
+      var ns = c.createBufferSource(); ns.buffer = noiseBuffer(c);
+      var bp = c.createBiquadFilter(); bp.type = 'bandpass';
+      bp.frequency.value = (o.f0 + o.f1) * 0.9; bp.Q.value = 1.2;
+      var ng = c.createGain(); ng.gain.value = o.breath;
+      ns.connect(bp); bp.connect(ng); ng.connect(g);
+      ns.start(t, Math.random() * 0.3, dur + 0.02);
     }
   }
 
-  function rnd(a, b) { return a + Math.random() * (b - a); }
-
   var motifs = {
-    whistle: function (c, bus, t, b) {               // soft rising or falling "tweeee"
-      var up = Math.random() < 0.6, d = rnd(0.3, 0.5);
-      chirp(c, bus, t, { f0: up ? b : b * 1.5, f1: up ? b * 1.5 : b * 1.1, dur: d, gain: 0.5, vib: rnd(6, 9), depth: b * 0.012 });
-      return t + d + 0.1;
+    whistle: function (c, bus, t, b) {               // soft, vibrato "tweeee"
+      var d = rnd(0.28, 0.55), r = Math.random();
+      var f0 = b * rnd(0.95, 1.1), f1, bend;
+      if (r < 0.4)      { f1 = f0 * rnd(1.35, 1.6); bend = rnd(-0.04, 0.04); }   // rising
+      else if (r < 0.75){ f1 = f0 * rnd(0.85, 1.0); bend = rnd(0.2, 0.35); }     // arch
+      else              { f0 *= 1.55; f1 = f0 * rnd(0.7, 0.85); bend = 0; }      // falling
+      chirp(c, bus, t, { f0: f0, f1: f1, bend: bend, dur: d, gain: 0.5, attack: 0.04,
+        vib: rnd(5.5, 9), depth: b * rnd(0.01, 0.025), breath: 0.05 });
+      return t + d + rnd(0.05, 0.14);
     },
-    roll: function (c, bus, t, b) {                  // the classic canary trill
-      var n = Math.floor(rnd(8, 21)), hi = b * rnd(1.55, 1.75), lo = b * 1.15;
+
+    roll: function (c, bus, t, b) {                  // the classic canary trill (a "tour")
+      var n = Math.floor(rnd(10, 28));
+      var hi = b * rnd(1.5, 1.8), lo = b * rnd(1.1, 1.28);
+      var step = rnd(0.052, 0.072), accel = rnd(-0.015, 0.02);
+      var drift = rnd(-0.004, 0.004);
       for (var i = 0; i < n; i++) {
-        var a = i % 2 === 0;
-        chirp(c, bus, t, { f0: a ? hi : lo * 1.05, f1: a ? lo : hi * 0.97, dur: 0.05, gain: 0.36 });
-        t += 0.062;
+        var up = i % 2 === 1;
+        var swell = 0.55 + 0.45 * Math.sin(Math.PI * (i + 0.5) / n);
+        chirp(c, bus, t, {
+          f0: jit(up ? lo : hi, 0.015), f1: jit(up ? hi : lo, 0.015),
+          bend: rnd(-0.04, 0.04), dur: step * 0.88,
+          gain: 0.34 * swell * rnd(0.88, 1.08), attack: 0.006, breath: 0.03 });
+        t += step * rnd(0.96, 1.04);
+        step *= 1 + accel; hi *= 1 + drift; lo *= 1 + drift;
       }
-      return t + 0.06;
+      return t + rnd(0.04, 0.1);
     },
-    warble: function (c, bus, t, b) {                // little descending warble
-      var f = b * rnd(1.8, 2.0), n = Math.floor(rnd(4, 7));
+
+    warble: function (c, bus, t, b) {                // rippling, falling warble
+      var f = b * rnd(1.8, 2.05), n = Math.floor(rnd(4, 8));
+      var step = rnd(0.1, 0.14);
       for (var i = 0; i < n; i++) {
-        chirp(c, bus, t, { f0: f, f1: f * 0.8, dur: 0.1, gain: 0.42, vib: 28, depth: f * 0.03 });
-        f *= 0.9; t += 0.125;
+        chirp(c, bus, t, { f0: f, f1: f * rnd(0.74, 0.86), bend: rnd(0.05, 0.12),
+          dur: step * 0.85, gain: 0.4 * rnd(0.9, 1.05), vib: rnd(24, 34), depth: f * 0.03, breath: 0.04 });
+        f *= rnd(0.88, 0.95); t += step * rnd(0.95, 1.08);
       }
-      return t + 0.08;
+      return t + 0.07;
     },
-    chips: function (c, bus, t, b) {                 // a few bright chip notes
-      var n = Math.floor(rnd(3, 6));
+
+    chips: function (c, bus, t, b) {                 // bright "chip chip chip", often speeding up
+      var n = Math.floor(rnd(3, 7)), gap = rnd(0.13, 0.2), f = b * rnd(1.35, 1.5);
       for (var i = 0; i < n; i++) {
-        chirp(c, bus, t, { f0: b * 1.4, f1: b * 1.7, dur: 0.07, gain: 0.4 });
-        t += 0.17;
+        chirp(c, bus, t, { f0: f * 0.95, f1: f * rnd(1.22, 1.4), ease: 0.6, dur: rnd(0.055, 0.08),
+          gain: 0.4 * rnd(0.85, 1.05), attack: 0.005, breath: 0.05 });
+        t += gap; gap *= rnd(0.86, 0.97);
       }
       return t + 0.05;
     },
+
+    peeps: function (c, bus, t, b) {                 // quick up-down "pee-oo" pairs
+      var n = Math.floor(rnd(2, 5)), f = b * rnd(1.5, 1.8);
+      for (var i = 0; i < n; i++) {
+        var d = rnd(0.09, 0.14);
+        chirp(c, bus, t, { f0: f, f1: f * 0.9, bend: rnd(0.12, 0.2), dur: d, gain: 0.42, breath: 0.04 });
+        t += d + rnd(0.05, 0.09);
+        f *= rnd(0.97, 1.05);
+      }
+      return t + 0.04;
+    },
+
+    sweepUp: function (c, bus, t, b) {               // fast rising run of little notes
+      var n = Math.floor(rnd(5, 10)), f = b * rnd(1.1, 1.25);
+      for (var i = 0; i < n; i++) {
+        chirp(c, bus, t, { f0: f, f1: f * 1.12, dur: 0.055, gain: 0.36, attack: 0.006 });
+        f *= rnd(1.03, 1.06); t += 0.07;
+      }
+      return t + 0.05;
+    },
+
     sigh: function (c, bus, t, b) {                  // slow, gentle falling finish
-      chirp(c, bus, t, { f0: b * 1.7, f1: b * 1.05, dur: 0.55, gain: 0.38, vib: 5, depth: b * 0.015 });
-      return t + 0.62;
+      var d = rnd(0.45, 0.7);
+      chirp(c, bus, t, { f0: b * rnd(1.6, 1.8), f1: b * rnd(1.0, 1.1), ease: 0.8, dur: d,
+        gain: 0.38, attack: 0.05, vib: rnd(4.5, 6.5), depth: b * 0.015, breath: 0.06 });
+      return t + d + 0.05;
     }
   };
 
+  function pick(list) { return list[Math.floor(Math.random() * list.length)]; }
+
   // Build one song phrase starting at time `at`; returns its length in seconds.
   function phrase(c, bus, at) {
-    var base = rnd(2200, 2800), t = at;
-    t = (Math.random() < 0.6 ? motifs.whistle : motifs.chips)(c, bus, t, base);
-    var middle = Math.random() < 0.5 ? 2 : 1;
-    for (var i = 0; i < middle; i++) t = (Math.random() < 0.55 ? motifs.roll : motifs.warble)(c, bus, t, base);
-    if (Math.random() < 0.7) t = motifs.sigh(c, bus, t, base);
+    var base = rnd(2100, 2800), t = at;
+    curPan = rnd(-0.35, 0.35);
+
+    t = pick([motifs.whistle, motifs.whistle, motifs.chips, motifs.peeps])(c, bus, t, base);
+
+    var parts = Math.floor(rnd(2, 5)), last = null;
+    for (var i = 0; i < parts; i++) {
+      var m;
+      do { m = pick([motifs.roll, motifs.roll, motifs.warble, motifs.peeps, motifs.sweepUp, motifs.whistle]); }
+      while (m === last);
+      last = m;
+      t = m(c, bus, t, base * rnd(0.95, 1.08));
+      t += rnd(0.0, 0.12);
+    }
+
+    if (Math.random() < 0.75) t = motifs.sigh(c, bus, t, base);
     return t - at;
   }
 
@@ -143,7 +264,9 @@
     loopTimer = setTimeout(function () {
       if (!loopOn || muted || document.hidden) return;
       var d = sing();
-      schedule(d * 1000 + rnd(5000, 11000));          // rest between phrases
+      // Real birds sometimes answer themselves quickly, then rest for a while.
+      var rest = Math.random() < 0.25 ? rnd(1500, 3000) : rnd(4500, 10000);
+      schedule(d * 1000 + rest);
     }, delayMs);
   }
 
